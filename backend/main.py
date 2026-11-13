@@ -1,3 +1,4 @@
+
 import os
 import json
 import urllib.parse
@@ -66,7 +67,7 @@ def instagram_account():
 
     return instagram_get(
         INSTAGRAM_USER_ID,
-        {"fields": "id,username,account_type,media_count"}
+        {"fields": "id,username"}
     )
 
 
@@ -88,7 +89,10 @@ def instagram_media():
 def instagram_comments(media_id: str):
     return instagram_get(
         f"{media_id}/comments",
-        {"fields": "id,username"}
+        {
+            "fields": "id,text,username,timestamp,like_count",
+            "limit": 100
+        }
     )
 
 
