@@ -88,10 +88,7 @@ def instagram_media():
 def instagram_comments(media_id: str):
     return instagram_get(
         f"{media_id}/comments",
-        {
-            "fields": "id,text,username,timestamp,like_count",
-            "limit": 100
-        }
+        {"fields": "id,username"}
     )
 
 
