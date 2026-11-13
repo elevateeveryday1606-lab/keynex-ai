@@ -1,0 +1,121 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keynex AI</title>
+<style>
+body {
+  background:#101018;
+  color:white;
+  font-family:Arial,sans-serif;
+  padding:20px;
+  max-width:600px;
+  margin:auto;
+}
+h1 {color:#a78bfa;text-align:center}
+.card {
+  background:#20202c;
+  padding:18px;
+  border-radius:14px;
+  margin:18px 0;
+}
+input,textarea,button {
+  width:100%;
+  box-sizing:border-box;
+  padding:13px;
+  margin-top:12px;
+  border-radius:9px;
+}
+textarea {min-height:130px}
+button {
+  background:#8b5cf6;
+  color:white;
+  border:0;
+  font-weight:bold;
+}
+video {width:100%;margin-top:15px}
+</style>
+</head>
+<body>
+
+<h1>🎵 KEYNEX AI</h1>
+<p style="text-align:center">
+Where comments become songs.
+</p>
+
+<div class="card">
+<h3>1. Upload your video</h3>
+<input type="file" id="video" accept="video/*">
+<video id="preview" controls hidden></video>
+</div>
+
+<div class="card">
+<h3>2. Add social media comments</h3>
+<p>One comment per line:</p>
+<p>username | comment | likes</p>
+<textarea id="comments"
+placeholder="user1 | This video is hilarious! | 250"></textarea>
+</div>
+
+<div class="card">
+<h3>3. Select comments</h3>
+<button onclick="selectComments()">
+FIND BEST COMMENTS
+</button>
+<div id="results"></div>
+</div>
+
+<script>
+const video = document.getElementById("video");
+const preview = document.getElementById("preview");
+
+video.onchange = () => {
+  if (video.files[0]) {
+    preview.src = URL.createObjectURL(video.files[0]);
+    preview.hidden = false;
+  }
+};
+
+async function selectComments() {
+  const lines = document.getElementById("comments")
+    .value.split("\n").filter(x => x.trim());
+
+  const comments = lines.map(line => {
+    const parts = line.split("|");
+    return {
+      username: (parts[0] || "").trim(),
+      text: (parts[1] || "").trim(),
+      likes: Number(parts[2]) || 0
+    };
+  });
+
+  const results = document.getElementById("results");
+  results.textContent = "Selecting comments...";
+
+  try {
+    const response = await fetch("/select-comments", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({comments})
+    });
+
+    if (!response.ok) throw new Error("Request failed");
+
+    const data = await response.json();
+    results.innerHTML = "<h3>Selected comments</h3>";
+
+    data.selected_comments.forEach(c => {
+      const p = document.createElement("p");
+      p.textContent = "@" + c.username + ": " +
+        c.text + " (" + c.likes + " likes)";
+      results.appendChild(p);
+    });
+  } catch (error) {
+    results.textContent = "Could not select comments. Please try again.";
+  }
+}
+</script>
+</body>
+</html>
