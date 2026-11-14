@@ -5,13 +5,13 @@ import urllib.request
 
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="Keynex AI")
-
 
 INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_USER_ID = os.getenv("INSTAGRAM_USER_ID")
@@ -35,7 +35,7 @@ def instagram_get(endpoint, params=None):
             500, "Instagram access token is missing."
         )
 
-    params = params or {}
+    params = dict(params or {})
     params["access_token"] = INSTAGRAM_TOKEN
 
     url = (
@@ -49,10 +49,31 @@ def instagram_get(endpoint, params=None):
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
-
-    except Exception as error:
+    except Exception:
         raise HTTPException(
             502, "Could not connect to Instagram."
+        )
+
+
+def validate_reel_url(value):
+    parsed = urlparse(value)
+
+    if (
+        parsed.scheme not in ("http", "https")
+        or parsed.hostname not in (
+            "instagram.com",
+            "www.instagram.com"
+        )
+    ):
+        raise HTTPException(
+            400, "Please enter a valid Instagram Reel link."
+        )
+
+    parts = parsed.path.strip("/").split("/")
+
+    if len(parts) < 2 or parts[0] != "reel":
+        raise HTTPException(
+            400, "The link must be an Instagram Reel."
         )
 
 
@@ -66,7 +87,9 @@ def home():
 @app.get("/instagram/account")
 def instagram_account():
     if not INSTAGRAM_USER_ID:
-        raise HTTPException(500, "Instagram User ID is missing.")
+        raise HTTPException(
+            500, "Instagram User ID is missing."
+        )
 
     return instagram_get(
         INSTAGRAM_USER_ID,
@@ -77,7 +100,9 @@ def instagram_account():
 @app.get("/instagram/media")
 def instagram_media():
     if not INSTAGRAM_USER_ID:
-        raise HTTPException(500, "Instagram User ID is missing.")
+        raise HTTPException(
+            500, "Instagram User ID is missing."
+        )
 
     return instagram_get(
         f"{INSTAGRAM_USER_ID}/media",
@@ -99,6 +124,86 @@ def instagram_comments(media_id: str):
     )
 
 
+@app.post("/prepare-production")
+async def prepare_production(
+    reel_url: str = Form(...),
+    music_style: str = Form(...),
+    screenshots: List[UploadFile] = File(...),
+    referee_video: UploadFile = File(...)
+):
+    validate_reel_url(reel_url)
+
+    if not music_style.strip():
+        raise HTTPException(
+            400, "Please choose a music style."
+        )
+
+    if not screenshots:
+        raise HTTPException(
+            400, "Please upload comment screenshots."
+        )
+
+    screenshot_results = []
+
+    for screenshot in screenshots:
+        if not screenshot.content_type or not screenshot.content_type.startswith("image/"):
+            raise HTTPException(
+                400, "Every comment screenshot must be an image."
+            )
+
+        content = await screenshot.read()
+
+        if not content:
+            raise HTTPException(
+                400, "An uploaded screenshot is empty."
+            )
+
+        if len(content) > 15 * 1024 * 1024:
+            raise HTTPException(
+                400, "Each screenshot must be under 15 MB."
+            )
+
+        screenshot_results.append({
+            "filename": screenshot.filename,
+            "size_bytes": len(content),
+            "received": True
+        })
+
+    if (
+        not referee_video.content_type
+        or not referee_video.content_type.startswith("video/")
+    ):
+        raise HTTPException(
+            400, "Please upload a referee video."
+        )
+
+    video_content = await referee_video.read()
+
+    if not video_content:
+        raise HTTPException(
+            400, "The referee video is empty."
+        )
+
+    if len(video_content) > 100 * 1024 * 1024:
+        raise HTTPException(
+            400, "The referee video must be under 100 MB."
+        )
+
+    return {
+        "status": "uploads_received",
+        "reel_url": reel_url,
+        "music_style": music_style,
+        "screenshots_received": len(screenshot_results),
+        "screenshots": screenshot_results,
+        "referee_video": {
+            "filename": referee_video.filename,
+            "size_bytes": len(video_content),
+            "received": True
+        },
+        "next_step": "Comment extraction and production processing are not connected yet."
+    }
+
+
 @app.post("/arrange-song")
 def arrange_song(data: SongRequest):
 
@@ -107,7 +212,6 @@ def arrange_song(data: SongRequest):
         if comment.text.strip()
     ]
 
-    # Preserve the submitted order and exact comment wording.
     sections = [
         ("Intro", 1),
         ("Verse 1", 4),
