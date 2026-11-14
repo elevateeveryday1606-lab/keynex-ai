@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VAR Check Music | Keynex AI</title>
+
 <style>
 body {
   background:#101018;
@@ -13,41 +14,51 @@ body {
   max-width:600px;
   margin:auto;
 }
-h1 {color:#a78bfa;text-align:center}
+h1 {
+  color:#a78bfa;
+  text-align:center;
+}
 .card {
   background:#20202c;
   padding:18px;
   border-radius:14px;
   margin:18px 0;
 }
-input,button {
+input, select, button {
   width:100%;
   box-sizing:border-box;
-  padding:14px;
+  padding:13px;
   margin-top:12px;
   border-radius:9px;
 }
-input {
+input, select {
   background:white;
   color:#111;
   border:0;
+}
+input[type="file"] {
+  background:#303044;
+  color:white;
 }
 button {
   background:#8b5cf6;
   color:white;
   border:0;
   font-weight:bold;
-  cursor:pointer;
 }
-.comment {
-  background:#303044;
-  padding:12px;
-  border-radius:9px;
-  margin-top:10px;
+.hint {
+  color:#c4b5fd;
+  font-size:13px;
+  line-height:1.5;
 }
-.section-title {color:#c4b5fd}
+.file-list {
+  color:#ddd;
+  font-size:13px;
+  overflow-wrap:anywhere;
+}
 </style>
 </head>
+
 <body>
 
 <h1>🎵 VAR CHECK MUSIC</h1>
@@ -57,80 +68,115 @@ Where comments become songs.
 
 <div class="card">
 <h3>1. Original Instagram Reel</h3>
+<p class="hint">
+Paste the link to the original video whose comments
+you want to turn into a song.
+</p>
 <input
   type="url"
   id="reelUrl"
-  placeholder="Paste any public Instagram Reel link"
+  placeholder="Paste Instagram Reel link"
 >
-<button onclick="findComments()">
-FIND COMMENTS
-</button>
 </div>
 
 <div class="card">
-<h3>2. Retrieved comments</h3>
-<p id="status">
-Your selected comments will appear here.
+<h3>2. Upload comment screenshots</h3>
+<p class="hint">
+Upload one or multiple screenshots showing the
+main comments from the Reel above.
 </p>
-<div id="results"></div>
+<input
+  type="file"
+  id="screenshots"
+  accept="image/*"
+  multiple
+>
+<div id="screenshotList" class="file-list">
+No screenshots selected.
+</div>
+</div>
+
+<div class="card">
+<h3>3. Upload referee video</h3>
+<p class="hint">
+This video will be used for the VAR CHECK transition
+between the original Reel and the generated music video.
+</p>
+<input
+  type="file"
+  id="refereeVideo"
+  accept="video/*"
+>
+<div id="refereeName" class="file-list">
+No referee video selected.
+</div>
+</div>
+
+<div class="card">
+<h3>4. Choose music style</h3>
+<p class="hint">
+Choose the genre for your song.
+</p>
+<select id="musicStyle">
+  <option value="">Choose music style</option>
+  <option>Amapiano</option>
+  <option>Afrobeat</option>
+  <option>Hip-hop</option>
+  <option>Gospel</option>
+  <option>R&B</option>
+  <option>House</option>
+  <option>Jazz</option>
+  <option>Pop</option>
+  <option>Other</option>
+</select>
+</div>
+
+<div class="card">
+<h3>5. Your VAR Check production</h3>
+<p class="hint">
+Keynex will extract the comments, identify duplicates,
+select the strongest comments and arrange them into
+song sections without changing their wording.
+</p>
+<p class="hint">
+The final video sequence:
+</p>
+<p>
+Original Reel → Referee VAR Check → Generated Song Video
+</p>
+<p class="hint">
+The original comment image, username and exact comment
+will appear on screen when each lyric is sung.
+</p>
 </div>
 
 <script>
-function isInstagramUrl(value) {
-  try {
-    const url = new URL(value);
-    return [
-      "instagram.com",
-      "www.instagram.com"
-    ].includes(url.hostname.toLowerCase());
-  } catch {
-    return false;
-  }
-}
+const screenshots =
+  document.getElementById("screenshots");
 
-async function findComments() {
-  const reelUrl = document.getElementById("reelUrl")
-    .value.trim();
+const screenshotList =
+  document.getElementById("screenshotList");
 
-  const status = document.getElementById("status");
-  const results = document.getElementById("results");
+screenshots.addEventListener("change", () => {
+  const files = Array.from(screenshots.files);
 
-  if (!isInstagramUrl(reelUrl)) {
-    alert("Please enter a valid Instagram Reel link.");
-    return;
-  }
+  screenshotList.textContent = files.length
+    ? files.length + " screenshot(s) selected: " +
+      files.map(file => file.name).join(", ")
+    : "No screenshots selected.";
+});
 
-  status.textContent = "Looking for comments...";
-  results.replaceChildren();
+const refereeVideo =
+  document.getElementById("refereeVideo");
 
-  try {
-    const response = await fetch("/import-comments", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({reel_url: reelUrl})
-    });
+const refereeName =
+  document.getElementById("refereeName");
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.detail || "Could not retrieve comments.");
-    }
-
-    status.textContent =
-      "Retrieved " + data.total_comments + " comments.";
-
-    data.comments.forEach(comment => {
-      const item = document.createElement("div");
-      item.className = "comment";
-      item.textContent =
-        "@" + comment.username + ": " + comment.text;
-      results.appendChild(item);
-    });
-
-  } catch (error) {
-    status.textContent = error.message;
-  }
-}
+refereeVideo.addEventListener("change", () => {
+  refereeName.textContent = refereeVideo.files.length
+    ? refereeVideo.files[0].name
+    : "No referee video selected.";
+});
 </script>
 
 </body>
