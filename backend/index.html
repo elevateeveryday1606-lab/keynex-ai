@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Keynex AI</title>
+<title>VAR Check Music | Keynex AI</title>
 <style>
 body {
   background:#101018;
@@ -32,7 +32,7 @@ input,textarea {
   color:#111;
   border:0;
 }
-textarea {min-height:130px}
+textarea {min-height:180px}
 button {
   background:#8b5cf6;
   color:white;
@@ -40,136 +40,164 @@ button {
   font-weight:bold;
   cursor:pointer;
 }
-video {width:100%;margin-top:15px}
-#results {overflow-wrap:anywhere}
+.comment {
+  background:#303044;
+  padding:12px;
+  border-radius:9px;
+  margin-top:10px;
+}
+.section-title {
+  color:#c4b5fd;
+}
+a {color:#c4b5fd}
 </style>
 </head>
 <body>
 
-<h1>🎵 KEYNEX AI</h1>
+<h1>🎵 VAR CHECK MUSIC</h1>
 <p style="text-align:center">
 Where comments become songs.
 </p>
 
 <div class="card">
-<h3>1. Upload your video</h3>
-<input type="file" id="video" accept="video/*">
-<video id="preview" controls hidden></video>
-</div>
-
-<div class="card">
-<h3>2. Add the original Instagram Reel link</h3>
+<h3>1. Original Instagram Reel</h3>
 <input
   type="url"
   id="reelUrl"
-  placeholder="https://www.instagram.com/reel/..."
+  placeholder="Paste the original Reel link"
 >
 </div>
 
 <div class="card">
-<h3>3. Add social media comments</h3>
+<h3>2. Import comments</h3>
 <p>One comment per line:</p>
-<p>username | comment | likes</p>
-<textarea id="comments"
-placeholder="user1 | This video is hilarious! | 250"></textarea>
+<p><b>username | exact comment | comment link</b></p>
+
+<textarea
+  id="comments"
+  placeholder="funnyguy | This is the funniest thing I've seen 😂 | https://www.instagram.com/reel/..."
+></textarea>
+
+<p>Keep every comment exactly as written. Do not rewrite it.</p>
 </div>
 
 <div class="card">
-<h3>4. Select comments</h3>
-<button onclick="selectComments()">
-FIND BEST COMMENTS
+<h3>3. Arrange comments into a song</h3>
+<button onclick="arrangeSong()">
+ARRANGE COMMENTS INTO SONG
 </button>
 <div id="results"></div>
 </div>
 
 <script>
-const video = document.getElementById("video");
-const preview = document.getElementById("preview");
-
-video.onchange = () => {
-  if (video.files[0]) {
-    preview.src = URL.createObjectURL(video.files[0]);
-    preview.hidden = false;
-  }
-};
-
-function isInstagramReelUrl(value) {
+function isInstagramUrl(value) {
   try {
     const url = new URL(value);
-    const host = url.hostname.toLowerCase();
-
-    return (
-      (host === "instagram.com" ||
-       host === "www.instagram.com") &&
-      /^\/(reel|reels)\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)
-    );
+    return [
+      "instagram.com",
+      "www.instagram.com"
+    ].includes(url.hostname.toLowerCase());
   } catch {
     return false;
   }
 }
 
-async function selectComments() {
+async function arrangeSong() {
   const reelUrl = document.getElementById("reelUrl")
     .value.trim();
-
-  if (!isInstagramReelUrl(reelUrl)) {
-    alert("Please enter a valid Instagram Reel link.");
-    return;
-  }
 
   const lines = document.getElementById("comments")
     .value.split("\n").filter(x => x.trim());
 
-  const comments = lines.map(line => {
-    const parts = line.split("|");
-    return {
-      username: (parts[0] || "").trim(),
-      text: (parts[1] || "").trim(),
-      likes: Number(parts[2]) || 0
-    };
-  });
-
   const results = document.getElementById("results");
-  results.textContent = "Selecting comments...";
+
+  if (!isInstagramUrl(reelUrl)) {
+    alert("Please enter a valid Instagram Reel link.");
+    return;
+  }
+
+  if (!lines.length) {
+    alert("Please add some comments first.");
+    return;
+  }
+
+  const comments = [];
+
+  for (const line of lines) {
+    const parts = line.split("|");
+
+    const username = (parts[0] || "").trim();
+    const text = (parts[1] || "").trim();
+    const commentUrl = (parts[2] || "").trim();
+
+    if (!username || !text) {
+      alert("Each line needs a username and exact comment.");
+      return;
+    }
+
+    if (commentUrl && !isInstagramUrl(commentUrl)) {
+      alert("One of the comment links is invalid.");
+      return;
+    }
+
+    comments.push({
+      username,
+      text,
+      comment_url: commentUrl || null
+    });
+  }
+
+  results.textContent = "Arranging your comments...";
 
   try {
-    const response = await fetch("/select-comments", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
+    const response = await fetch("/arrange-song", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
         reel_url: reelUrl,
         comments: comments
       })
     });
 
-    if (!response.ok) throw new Error("Request failed");
+    if (!response.ok) {
+      throw new Error("Request failed");
+    }
 
     const data = await response.json();
     results.replaceChildren();
 
     const heading = document.createElement("h3");
-    heading.textContent = "Selected comments";
+    heading.textContent = "Your song arrangement";
     results.appendChild(heading);
 
-    const link = document.createElement("a");
-    link.href = reelUrl;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = "View original Instagram Reel";
-    link.style.color = "#c4b5fd";
-    results.appendChild(link);
+    const reel = document.createElement("a");
+    reel.href = data.reel_url;
+    reel.target = "_blank";
+    reel.rel = "noopener noreferrer";
+    reel.textContent = "View original Reel";
+    results.appendChild(reel);
 
-    data.selected_comments.forEach(c => {
-      const p = document.createElement("p");
-      p.textContent = "@" + c.username + ": " +
-        c.text + " (" + c.likes + " likes)";
-      results.appendChild(p);
+    data.song_sections.forEach(section => {
+      const title = document.createElement("h3");
+      title.className = "section-title";
+      title.textContent = section.section;
+      results.appendChild(title);
+
+      section.comments.forEach(comment => {
+        const item = document.createElement("div");
+        item.className = "comment";
+        item.textContent =
+          "@" + comment.username + ": " + comment.text;
+        results.appendChild(item);
+      });
     });
+
   } catch (error) {
     results.textContent =
-      "Could not select comments. Please try again.";
+      "Could not arrange the comments. Please try again.";
   }
 }
 </script>
+
 </body>
 </html>
