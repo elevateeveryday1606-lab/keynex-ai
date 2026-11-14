@@ -2,15 +2,16 @@ import os
 import json
 import urllib.parse
 import urllib.request
-import urllib.error
 
 from pathlib import Path
+from typing import List, Optional
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import List
 
 app = FastAPI(title="Keynex AI")
+
 
 INSTAGRAM_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 INSTAGRAM_USER_ID = os.getenv("INSTAGRAM_USER_ID")
@@ -20,17 +21,19 @@ API_VERSION = os.getenv("GRAPH_API_VERSION", "v26.0")
 class Comment(BaseModel):
     username: str
     text: str
-    likes: int = 0
+    comment_url: Optional[str] = None
 
 
-class CommentRequest(BaseModel):
+class SongRequest(BaseModel):
     reel_url: str
     comments: List[Comment]
 
 
 def instagram_get(endpoint, params=None):
     if not INSTAGRAM_TOKEN:
-        raise HTTPException(500, "Instagram access token is missing.")
+        raise HTTPException(
+            500, "Instagram access token is missing."
+        )
 
     params = params or {}
     params["access_token"] = INSTAGRAM_TOKEN
@@ -46,16 +49,18 @@ def instagram_get(endpoint, params=None):
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as error:
-        details = error.read().decode("utf-8")
-        raise HTTPException(error.code, details)
-    except Exception:
-        raise HTTPException(502, "Could not connect to Instagram.")
+
+    except Exception as error:
+        raise HTTPException(
+            502, "Could not connect to Instagram."
+        )
 
 
 @app.get("/")
 def home():
-    return FileResponse(Path(__file__).parent / "index.html")
+    return FileResponse(
+        Path(__file__).parent / "index.html"
+    )
 
 
 @app.get("/instagram/account")
@@ -94,23 +99,49 @@ def instagram_comments(media_id: str):
     )
 
 
-@app.post("/select-comments")
-def select_comments(data: CommentRequest):
+@app.post("/arrange-song")
+def arrange_song(data: SongRequest):
+
     valid_comments = [
         comment for comment in data.comments
         if comment.text.strip()
     ]
 
-    selected = sorted(
-        valid_comments,
-        key=lambda comment: comment.likes,
-        reverse=True
-    )
+    # Preserve the submitted order and exact comment wording.
+    sections = [
+        ("Intro", 1),
+        ("Verse 1", 4),
+        ("Chorus", 2),
+        ("Verse 2", 4),
+        ("Bridge", 2),
+        ("Outro", 1000)
+    ]
+
+    song_sections = []
+    position = 0
+
+    for section_name, maximum in sections:
+        if position >= len(valid_comments):
+            break
+
+        section_comments = valid_comments[
+            position:position + maximum
+        ]
+
+        if section_comments:
+            song_sections.append({
+                "section": section_name,
+                "comments": [
+                    comment.model_dump()
+                    for comment in section_comments
+                ]
+            })
+
+        position += len(section_comments)
 
     return {
         "reel_url": data.reel_url,
-        "selected_comments": [
-            comment.model_dump()
-            for comment in selected[:10]
-        ]
+        "song_sections": song_sections,
+        "total_comments": len(valid_comments),
+        "wording_preserved": True
     }
