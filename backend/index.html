@@ -20,19 +20,18 @@ h1 {color:#a78bfa;text-align:center}
   border-radius:14px;
   margin:18px 0;
 }
-input,textarea,button {
+input,button {
   width:100%;
   box-sizing:border-box;
-  padding:13px;
+  padding:14px;
   margin-top:12px;
   border-radius:9px;
 }
-input,textarea {
-  background:#fff;
+input {
+  background:white;
   color:#111;
   border:0;
 }
-textarea {min-height:180px}
 button {
   background:#8b5cf6;
   color:white;
@@ -46,10 +45,7 @@ button {
   border-radius:9px;
   margin-top:10px;
 }
-.section-title {
-  color:#c4b5fd;
-}
-a {color:#c4b5fd}
+.section-title {color:#c4b5fd}
 </style>
 </head>
 <body>
@@ -64,28 +60,18 @@ Where comments become songs.
 <input
   type="url"
   id="reelUrl"
-  placeholder="Paste the original Reel link"
+  placeholder="Paste any public Instagram Reel link"
 >
-</div>
-
-<div class="card">
-<h3>2. Import comments</h3>
-<p>One comment per line:</p>
-<p><b>username | exact comment | comment link</b></p>
-
-<textarea
-  id="comments"
-  placeholder="funnyguy | This is the funniest thing I've seen 😂 | https://www.instagram.com/reel/..."
-></textarea>
-
-<p>Keep every comment exactly as written. Do not rewrite it.</p>
-</div>
-
-<div class="card">
-<h3>3. Arrange comments into a song</h3>
-<button onclick="arrangeSong()">
-ARRANGE COMMENTS INTO SONG
+<button onclick="findComments()">
+FIND COMMENTS
 </button>
+</div>
+
+<div class="card">
+<h3>2. Retrieved comments</h3>
+<p id="status">
+Your selected comments will appear here.
+</p>
 <div id="results"></div>
 </div>
 
@@ -102,13 +88,11 @@ function isInstagramUrl(value) {
   }
 }
 
-async function arrangeSong() {
+async function findComments() {
   const reelUrl = document.getElementById("reelUrl")
     .value.trim();
 
-  const lines = document.getElementById("comments")
-    .value.split("\n").filter(x => x.trim());
-
+  const status = document.getElementById("status");
   const results = document.getElementById("results");
 
   if (!isInstagramUrl(reelUrl)) {
@@ -116,85 +100,35 @@ async function arrangeSong() {
     return;
   }
 
-  if (!lines.length) {
-    alert("Please add some comments first.");
-    return;
-  }
-
-  const comments = [];
-
-  for (const line of lines) {
-    const parts = line.split("|");
-
-    const username = (parts[0] || "").trim();
-    const text = (parts[1] || "").trim();
-    const commentUrl = (parts[2] || "").trim();
-
-    if (!username || !text) {
-      alert("Each line needs a username and exact comment.");
-      return;
-    }
-
-    if (commentUrl && !isInstagramUrl(commentUrl)) {
-      alert("One of the comment links is invalid.");
-      return;
-    }
-
-    comments.push({
-      username,
-      text,
-      comment_url: commentUrl || null
-    });
-  }
-
-  results.textContent = "Arranging your comments...";
+  status.textContent = "Looking for comments...";
+  results.replaceChildren();
 
   try {
-    const response = await fetch("/arrange-song", {
+    const response = await fetch("/import-comments", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        reel_url: reelUrl,
-        comments: comments
-      })
+      body: JSON.stringify({reel_url: reelUrl})
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      throw new Error("Request failed");
+      throw new Error(data.detail || "Could not retrieve comments.");
     }
 
-    const data = await response.json();
-    results.replaceChildren();
+    status.textContent =
+      "Retrieved " + data.total_comments + " comments.";
 
-    const heading = document.createElement("h3");
-    heading.textContent = "Your song arrangement";
-    results.appendChild(heading);
-
-    const reel = document.createElement("a");
-    reel.href = data.reel_url;
-    reel.target = "_blank";
-    reel.rel = "noopener noreferrer";
-    reel.textContent = "View original Reel";
-    results.appendChild(reel);
-
-    data.song_sections.forEach(section => {
-      const title = document.createElement("h3");
-      title.className = "section-title";
-      title.textContent = section.section;
-      results.appendChild(title);
-
-      section.comments.forEach(comment => {
-        const item = document.createElement("div");
-        item.className = "comment";
-        item.textContent =
-          "@" + comment.username + ": " + comment.text;
-        results.appendChild(item);
-      });
+    data.comments.forEach(comment => {
+      const item = document.createElement("div");
+      item.className = "comment";
+      item.textContent =
+        "@" + comment.username + ": " + comment.text;
+      results.appendChild(item);
     });
 
   } catch (error) {
-    results.textContent =
-      "Could not arrange the comments. Please try again.";
+    status.textContent = error.message;
   }
 }
 </script>
