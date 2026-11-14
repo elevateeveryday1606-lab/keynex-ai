@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VAR Check Music | Keynex AI</title>
-
 <style>
 body {
   background:#101018;
@@ -14,24 +13,21 @@ body {
   max-width:600px;
   margin:auto;
 }
-h1 {
-  color:#a78bfa;
-  text-align:center;
-}
+h1 {color:#a78bfa;text-align:center}
 .card {
   background:#20202c;
   padding:18px;
   border-radius:14px;
   margin:18px 0;
 }
-input, select, button {
+input,select,button {
   width:100%;
   box-sizing:border-box;
   padding:13px;
   margin-top:12px;
   border-radius:9px;
 }
-input, select {
+input,select {
   background:white;
   color:#111;
   border:0;
@@ -45,7 +41,9 @@ button {
   color:white;
   border:0;
   font-weight:bold;
+  cursor:pointer;
 }
+button:disabled {opacity:.5}
 .hint {
   color:#c4b5fd;
   font-size:13px;
@@ -58,39 +56,22 @@ button {
 }
 </style>
 </head>
-
 <body>
 
 <h1>🎵 VAR CHECK MUSIC</h1>
-<p style="text-align:center">
-Where comments become songs.
-</p>
+<p style="text-align:center">Where comments become songs.</p>
 
 <div class="card">
 <h3>1. Original Instagram Reel</h3>
-<p class="hint">
-Paste the link to the original video whose comments
-you want to turn into a song.
-</p>
-<input
-  type="url"
-  id="reelUrl"
-  placeholder="Paste Instagram Reel link"
->
+<input type="url" id="reelUrl"
+placeholder="Paste Instagram Reel link">
 </div>
 
 <div class="card">
 <h3>2. Upload comment screenshots</h3>
-<p class="hint">
-Upload one or multiple screenshots showing the
-main comments from the Reel above.
-</p>
-<input
-  type="file"
-  id="screenshots"
-  accept="image/*"
-  multiple
->
+<p class="hint">Upload one or multiple screenshots of the main comments.</p>
+<input type="file" id="screenshots"
+accept="image/*" multiple>
 <div id="screenshotList" class="file-list">
 No screenshots selected.
 </div>
@@ -98,15 +79,7 @@ No screenshots selected.
 
 <div class="card">
 <h3>3. Upload referee video</h3>
-<p class="hint">
-This video will be used for the VAR CHECK transition
-between the original Reel and the generated music video.
-</p>
-<input
-  type="file"
-  id="refereeVideo"
-  accept="video/*"
->
+<input type="file" id="refereeVideo" accept="video/*">
 <div id="refereeName" class="file-list">
 No referee video selected.
 </div>
@@ -114,69 +87,126 @@ No referee video selected.
 
 <div class="card">
 <h3>4. Choose music style</h3>
-<p class="hint">
-Choose the genre for your song.
-</p>
 <select id="musicStyle">
-  <option value="">Choose music style</option>
-  <option>Amapiano</option>
-  <option>Afrobeat</option>
-  <option>Hip-hop</option>
-  <option>Gospel</option>
-  <option>R&B</option>
-  <option>House</option>
-  <option>Jazz</option>
-  <option>Pop</option>
-  <option>Other</option>
+<option value="">Choose music style</option>
+<option>Amapiano</option>
+<option>Afrobeat</option>
+<option>Hip-hop</option>
+<option>Gospel</option>
+<option>R&B</option>
+<option>House</option>
+<option>Jazz</option>
+<option>Pop</option>
+<option>Other</option>
 </select>
 </div>
 
 <div class="card">
-<h3>5. Your VAR Check production</h3>
+<h3>5. Submit production files</h3>
 <p class="hint">
-Keynex will extract the comments, identify duplicates,
-select the strongest comments and arrange them into
-song sections without changing their wording.
+Keynex will receive your files. Comment extraction,
+song generation and video editing will be connected
+in the next stages.
 </p>
-<p class="hint">
-The final video sequence:
-</p>
-<p>
-Original Reel → Referee VAR Check → Generated Song Video
-</p>
-<p class="hint">
-The original comment image, username and exact comment
-will appear on screen when each lyric is sung.
-</p>
+<button id="submitButton" onclick="submitProduction()">
+SUBMIT TO KEYNEX
+</button>
+<p id="status" class="hint"></p>
 </div>
 
 <script>
-const screenshots =
-  document.getElementById("screenshots");
-
-const screenshotList =
-  document.getElementById("screenshotList");
+const screenshots = document.getElementById("screenshots");
+const screenshotList = document.getElementById("screenshotList");
+const refereeVideo = document.getElementById("refereeVideo");
+const refereeName = document.getElementById("refereeName");
 
 screenshots.addEventListener("change", () => {
   const files = Array.from(screenshots.files);
-
   screenshotList.textContent = files.length
-    ? files.length + " screenshot(s) selected: " +
+    ? files.length + " screenshot(s): " +
       files.map(file => file.name).join(", ")
     : "No screenshots selected.";
 });
-
-const refereeVideo =
-  document.getElementById("refereeVideo");
-
-const refereeName =
-  document.getElementById("refereeName");
 
 refereeVideo.addEventListener("change", () => {
   refereeName.textContent = refereeVideo.files.length
     ? refereeVideo.files[0].name
     : "No referee video selected.";
 });
+
+function isInstagramUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["instagram.com", "www.instagram.com"]
+      .includes(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+async function submitProduction() {
+  const reelUrl = document.getElementById("reelUrl").value.trim();
+  const musicStyle = document.getElementById("musicStyle").value;
+  const status = document.getElementById("status");
+  const button = document.getElementById("submitButton");
+
+  if (!isInstagramUrl(reelUrl)) {
+    alert("Please enter a valid Instagram link.");
+    return;
+  }
+
+  if (!screenshots.files.length) {
+    alert("Please upload at least one comment screenshot.");
+    return;
+  }
+
+  if (!refereeVideo.files.length) {
+    alert("Please upload your referee video.");
+    return;
+  }
+
+  if (!musicStyle) {
+    alert("Please choose a music style.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("reel_url", reelUrl);
+  formData.append("music_style", musicStyle);
+
+  for (const file of screenshots.files) {
+    formData.append("screenshots", file);
+  }
+
+  formData.append("referee_video", refereeVideo.files[0]);
+
+  button.disabled = true;
+  status.textContent = "Uploading files to Keynex...";
+
+  try {
+    const response = await fetch("/prepare-production", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || "Upload failed.");
+    }
+
+    status.textContent =
+      "Success! Keynex received " +
+      data.screenshots_received +
+      " screenshot(s) and your referee video. " +
+      "Comment extraction is the next stage.";
+
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
 </script>
 
 </body>
