@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,14 +27,21 @@ input,textarea,button {
   margin-top:12px;
   border-radius:9px;
 }
+input,textarea {
+  background:#fff;
+  color:#111;
+  border:0;
+}
 textarea {min-height:130px}
 button {
   background:#8b5cf6;
   color:white;
   border:0;
   font-weight:bold;
+  cursor:pointer;
 }
 video {width:100%;margin-top:15px}
+#results {overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -52,7 +58,16 @@ Where comments become songs.
 </div>
 
 <div class="card">
-<h3>2. Add social media comments</h3>
+<h3>2. Add the original Instagram Reel link</h3>
+<input
+  type="url"
+  id="reelUrl"
+  placeholder="https://www.instagram.com/reel/..."
+>
+</div>
+
+<div class="card">
+<h3>3. Add social media comments</h3>
 <p>One comment per line:</p>
 <p>username | comment | likes</p>
 <textarea id="comments"
@@ -60,7 +75,7 @@ placeholder="user1 | This video is hilarious! | 250"></textarea>
 </div>
 
 <div class="card">
-<h3>3. Select comments</h3>
+<h3>4. Select comments</h3>
 <button onclick="selectComments()">
 FIND BEST COMMENTS
 </button>
@@ -78,7 +93,30 @@ video.onchange = () => {
   }
 };
 
+function isInstagramReelUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+
+    return (
+      (host === "instagram.com" ||
+       host === "www.instagram.com") &&
+      /^\/(reel|reels)\/[A-Za-z0-9_-]+\/?$/.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function selectComments() {
+  const reelUrl = document.getElementById("reelUrl")
+    .value.trim();
+
+  if (!isInstagramReelUrl(reelUrl)) {
+    alert("Please enter a valid Instagram Reel link.");
+    return;
+  }
+
   const lines = document.getElementById("comments")
     .value.split("\n").filter(x => x.trim());
 
@@ -98,13 +136,28 @@ async function selectComments() {
     const response = await fetch("/select-comments", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({comments})
+      body:JSON.stringify({
+        reel_url: reelUrl,
+        comments: comments
+      })
     });
 
     if (!response.ok) throw new Error("Request failed");
 
     const data = await response.json();
-    results.innerHTML = "<h3>Selected comments</h3>";
+    results.replaceChildren();
+
+    const heading = document.createElement("h3");
+    heading.textContent = "Selected comments";
+    results.appendChild(heading);
+
+    const link = document.createElement("a");
+    link.href = reelUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "View original Instagram Reel";
+    link.style.color = "#c4b5fd";
+    results.appendChild(link);
 
     data.selected_comments.forEach(c => {
       const p = document.createElement("p");
@@ -113,7 +166,8 @@ async function selectComments() {
       results.appendChild(p);
     });
   } catch (error) {
-    results.textContent = "Could not select comments. Please try again.";
+    results.textContent =
+      "Could not select comments. Please try again.";
   }
 }
 </script>
