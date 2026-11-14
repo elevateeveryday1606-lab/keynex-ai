@@ -3,6 +3,10 @@ import json
 import urllib.parse
 import urllib.request
 
+from io import BytesIO
+from PIL import Image
+import pytesseract
+
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
