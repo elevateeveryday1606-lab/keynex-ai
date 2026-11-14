@@ -4,12 +4,14 @@ import urllib.parse
 import urllib.request
 
 from io import BytesIO
-from PIL import Image
-import pytesseract
-
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
+from collections import defaultdict
+
+from PIL import Image, UnidentifiedImageError
+import pytesseract
+from pytesseract import Output
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
@@ -78,6 +80,63 @@ def validate_reel_url(value):
     if len(parts) < 2 or parts[0] != "reel":
         raise HTTPException(
             400, "The link must be an Instagram Reel."
+        )
+
+
+def read_screenshot(content):
+    try:
+        image = Image.open(BytesIO(content))
+        image.verify()
+
+        image = Image.open(BytesIO(content)).convert("RGB")
+
+    except (UnidentifiedImageError, OSError):
+        raise HTTPException(
+            400, "Keynex could not read one of the screenshots."
+        )
+
+    try:
+        data = pytesseract.image_to_data(
+            image,
+            output_type=Output.DICT,
+            config="--psm 6"
+        )
+
+        grouped_lines = defaultdict(list)
+
+        for i, word in enumerate(data["text"]):
+            word = word.strip()
+
+            if not word:
+                continue
+
+            key = (
+                data["block_num"][i],
+                data["par_num"][i],
+                data["line_num"][i]
+            )
+
+            grouped_lines[key].append(word)
+
+        lines = [
+            " ".join(words)
+            for words in grouped_lines.values()
+        ]
+
+        full_text = pytesseract.image_to_string(
+            image,
+            config="--psm 6"
+        ).strip()
+
+        return {
+            "recognized_text": full_text,
+            "recognized_lines": lines
+        }
+
+    except Exception:
+        raise HTTPException(
+            500,
+            "OCR failed. Please check that Tesseract is installed."
         )
 
 
@@ -150,7 +209,10 @@ async def prepare_production(
     screenshot_results = []
 
     for screenshot in screenshots:
-        if not screenshot.content_type or not screenshot.content_type.startswith("image/"):
+        if (
+            not screenshot.content_type
+            or not screenshot.content_type.startswith("image/")
+        ):
             raise HTTPException(
                 400, "Every comment screenshot must be an image."
             )
@@ -167,10 +229,14 @@ async def prepare_production(
                 400, "Each screenshot must be under 15 MB."
             )
 
+        ocr_result = read_screenshot(content)
+
         screenshot_results.append({
             "filename": screenshot.filename,
             "size_bytes": len(content),
-            "received": True
+            "received": True,
+            "recognized_text": ocr_result["recognized_text"],
+            "recognized_lines": ocr_result["recognized_lines"]
         })
 
     if (
@@ -194,7 +260,7 @@ async def prepare_production(
         )
 
     return {
-        "status": "uploads_received",
+        "status": "ocr_completed",
         "reel_url": reel_url,
         "music_style": music_style,
         "screenshots_received": len(screenshot_results),
@@ -204,7 +270,7 @@ async def prepare_production(
             "size_bytes": len(video_content),
             "received": True
         },
-        "next_step": "Comment extraction and production processing are not connected yet."
+        "next_step": "Structure the recognised text into usernames, comments and like counts."
     }
 
 
